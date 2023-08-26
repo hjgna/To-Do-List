@@ -1,0 +1,197 @@
+import tkinter as tk
+from datetime import datetime, timedelta
+from tkinter import simpledialog
+
+class Task:
+    def __init__(self, title):
+        self.title = title
+        self.start_time = None
+        self.elapsed_time = timedelta()
+        self.is_paused = False
+
+class ToDoListWidget:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("To-Do List Widget")
+        
+        self.tasks = [
+            Task("Task 1"),
+            Task("Task 2"),
+            # Add more tasks here
+        ]
+        
+        self.selected_task_index = tk.IntVar(value=0)
+        
+        self.title_label = tk.Label(self.root, text="To-Do List Widget", font=("Helvetica", 16))
+        self.title_label.pack(pady=10)
+
+        self.subtitle_label = tk.Label(self.root, text="(Double Click Task Name to Rename)", font=("Helvetica", 12))
+        self.subtitle_label.pack()
+        
+        self.task_listbox = tk.Listbox(self.root, selectmode=tk.SINGLE)
+        for task in self.tasks:
+            self.task_listbox.insert(tk.END, task.title)
+        self.task_listbox.pack(padx=10, pady=10)
+        self.task_listbox.bind("<Double-Button-1>", self.rename_task)
+        self.task_listbox.bind("<<ListboxSelect>>", self.on_task_select)
+        
+        self.current_task_label = tk.Label(self.root, text="Current Task:", font=("Helvetica", 12))
+        self.current_task_label.pack()
+        
+        self.time_label = tk.Label(self.root, text="Time Spent: 00:00:00", font=("Helvetica", 12))
+        self.time_label.pack()
+        
+        self.button_frame = tk.Frame(self.root)
+        self.button_frame.pack(pady=10)
+        
+        self.start_button = tk.Button(self.button_frame, text="Start", command=self.toggle_timer)
+        self.start_button.grid(row=0, column=0, padx=5)
+        
+        self.stop_button = tk.Button(self.button_frame, text="Stop", command=self.stop_timer, state=tk.DISABLED)
+        self.stop_button.grid(row=0, column=1, padx=5)
+        
+        self.move_up_button = tk.Button(self.button_frame, text="Move Up", command=self.move_task_up)
+        self.move_up_button.grid(row=1, column=0, padx=5)
+        
+        self.move_down_button = tk.Button(self.button_frame, text="Move Down", command=self.move_task_down)
+        self.move_down_button.grid(row=1, column=1, padx=5)
+        
+        self.add_button = tk.Button(self.button_frame, text="Add Task", command=self.add_task)
+        self.add_button.grid(row=2, column=0, padx=5)
+        
+        self.delete_button = tk.Button(self.button_frame, text="Delete Task", command=self.delete_task)
+        self.delete_button.grid(row=2, column=1, padx=5)
+
+        
+        self.update_labels()
+
+    def toggle_timer(self):
+        selected_task = self.tasks[self.selected_task_index.get()]
+        
+        if not selected_task.start_time:
+            # Start the timer
+            selected_task.start_time = datetime.now()
+            selected_task.is_paused = False
+            
+            self.start_button.config(text="Pause")
+            self.update_timer()
+        elif selected_task.is_paused:
+            # Resume the timer
+            selected_task.start_time = datetime.now()
+            selected_task.is_paused = False
+            
+            self.start_button.config(text="Pause")
+            self.update_timer()
+        else:
+            # Pause the timer
+            selected_task.elapsed_time += datetime.now() - selected_task.start_time
+            selected_task.is_paused = True
+            
+            self.start_button.config(text="Resume")
+        
+        self.update_labels()
+
+    def stop_timer(self):
+        selected_task = self.tasks[self.selected_task_index.get()]
+        selected_task.elapsed_time = timedelta()
+        selected_task.start_time = None
+        selected_task.is_paused = False
+        
+        self.start_button.config(text="Start")
+        self.stop_button.config(state=tk.DISABLED)
+        
+        self.update_labels()
+        self.update_timer()
+
+    def update_timer(self):
+        selected_task = self.tasks[self.selected_task_index.get()]
+        if not selected_task.is_paused:
+            elapsed = selected_task.elapsed_time + (datetime.now() - selected_task.start_time)
+            elapsed_str = str(elapsed).split(".")[0]  # Format as HH:MM:SS
+            self.time_label.config(text=f"Time Spent: {elapsed_str}")
+            self.root.after(1000, self.update_timer)
+
+    def update_labels(self):
+        selected_task = self.tasks[self.selected_task_index.get()]
+        self.current_task_label.config(text=f"Current Task: {selected_task.title}")
+        
+        if selected_task.is_paused:
+            self.start_button.config(text="Resume")
+        elif selected_task.start_time:
+            self.start_button.config(text="Pause")
+        else:
+            self.start_button.config(text="Start")
+        
+        if selected_task.start_time and not selected_task.is_paused:
+            self.stop_button.config(state=tk.NORMAL)
+        else:
+            self.stop_button.config(state=tk.DISABLED)
+
+    def rename_task(self, event=None):
+        selected_index = self.task_listbox.curselection()
+        if selected_index:
+            selected_index = selected_index[0]
+            new_title = tk.simpledialog.askstring("Rename Task", "Enter new task name:")
+            if new_title:
+                self.tasks[selected_index].title = new_title
+                self.task_listbox.delete(selected_index)
+                self.task_listbox.insert(selected_index, new_title)
+
+    def move_task_up(self):
+        selected_index = self.task_listbox.curselection()
+        if selected_index and selected_index[0] > 0:
+            selected_index = selected_index[0]
+            self.tasks[selected_index], self.tasks[selected_index - 1] = self.tasks[selected_index - 1], self.tasks[selected_index]
+            self.update_task_listbox(selected_index - 1)
+
+    def move_task_down(self):
+        selected_index = self.task_listbox.curselection()
+        if selected_index and selected_index[0] < len(self.tasks) - 1:
+            selected_index = selected_index[0]
+            self.tasks[selected_index], self.tasks[selected_index + 1] = self.tasks[selected_index + 1], self.tasks[selected_index]
+            self.update_task_listbox(selected_index + 1)
+
+    def update_task_listbox(self, new_index):
+        self.task_listbox.delete(0, tk.END)
+        for task in self.tasks:
+            self.task_listbox.insert(tk.END, task.title)
+        self.selected_task_index.set(new_index)
+        self.update_labels()
+
+    def on_task_select(self, event):
+        selected_index = self.task_listbox.curselection()
+        if selected_index:
+            self.selected_task_index.set(selected_index[0])
+            self.update_labels()
+
+    def add_task(self):
+        new_title = tk.simpledialog.askstring("Add Task", "Enter new task name:")
+        if new_title:
+            self.tasks.append(Task(new_title))
+            self.task_listbox.insert(tk.END, new_title)
+
+    def delete_task(self):
+        selected_index = self.task_listbox.curselection()
+        if selected_index:
+            selected_index = selected_index[0]
+            del self.tasks[selected_index]
+            self.task_listbox.delete(selected_index)
+            if selected_index >= len(self.tasks):
+                selected_index = len(self.tasks) - 1
+            self.update_labels()
+            self.update_task_listbox(selected_index)
+
+def rename_task(self, event=None):
+        selected_index = self.task_listbox.curselection()
+        if selected_index:
+            selected_index = selected_index[0]
+            new_title = tk.simpledialog.askstring("Rename Task", "Enter new task name:")
+            if new_title:
+                self.tasks[selected_index].title = new_title
+                self.task_listbox.delete(selected_index)
+                self.task_listbox.insert(selected_index, new_title)
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = ToDoListWidget(root)
+    root.mainloop()
